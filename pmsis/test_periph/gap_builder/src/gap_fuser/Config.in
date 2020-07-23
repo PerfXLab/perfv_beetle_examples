@@ -1,0 +1,9 @@
+config AOS_APP_GAP_FUSER
+    bool "gap_fuser"
+    select AOS_COMP_OSAL_AOS
+    help
+        gap_fuser (to be used with openocd)
+
+if AOS_APP_GAP_FUSER
+# Configurations for app gap_fuser
+endif

@@ -1,0 +1,9 @@
+config AOS_APP_GAP_FLASHER
+    bool "gap_flasher"
+    select AOS_COMP_OSAL_AOS
+    help
+        gap_flasher (to be used with openocd)
+
+if AOS_APP_GAP_FLASHER
+# Configurations for app gap_flasher
+endif

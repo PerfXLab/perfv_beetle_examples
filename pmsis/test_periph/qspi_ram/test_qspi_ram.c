@@ -1,0 +1,103 @@
+/* PMSIS includes */
+#include "pmsis.h"
+#include "bsp/ram.h"
+#include "bsp/ram/spiram.h"
+
+/* Variables used. */
+#define BUFFER_SIZE      ( 20 )
+
+static uint8_t *buff, *rcv_buff;
+static uint32_t spi_buff;
+static struct pi_device ram;
+static struct pi_spiram_conf conf;
+
+
+void test_spi_ram(void)
+{
+    printf("Entering main controller\n");
+
+    uint32_t errors = 0;
+
+    buff = (uint8_t *) pmsis_l2_malloc((uint32_t) BUFFER_SIZE);
+    if (buff == NULL)
+    {
+        printf("buff alloc failed !\n");
+        pmsis_exit(-1);
+    }
+
+    rcv_buff = (uint8_t *) pmsis_l2_malloc((uint32_t) BUFFER_SIZE);
+    if (rcv_buff == NULL)
+    {
+        printf("rcv_buff alloc failed !\n");
+        pmsis_exit(-2);
+    }
+
+    for (uint32_t i=0; i<(uint32_t) BUFFER_SIZE; i++)
+    {
+        buff[i] = i & 0xFF;
+        rcv_buff[i] = 0;
+    }
+
+    /* Init & open ram. */
+    pi_spiram_conf_init(&conf);
+    pi_open_from_conf(&ram, &conf);
+    if (pi_ram_open(&ram))
+    {
+        printf("Error ram open !\n");
+        pmsis_exit(-3);
+    }
+    
+    if (pi_ram_alloc(&ram, &spi_buff, (uint32_t) BUFFER_SIZE))
+    {
+        printf("Ram malloc failed !\n");
+        pmsis_exit(-4);
+    }
+    else
+    {
+        printf("Ram allocated : %lx %ld.\n", spi_buff, (uint32_t) BUFFER_SIZE);
+    }
+    
+    pi_task_t cb_tx, cb_rx;
+    
+    pi_ram_read_async(&ram, spi_buff, rcv_buff, (uint32_t) BUFFER_SIZE,&cb_rx);
+    printf("Read sync done.\n");
+
+    /* Verification. */
+    for (uint32_t i=0; i<(uint32_t) BUFFER_SIZE; i++)
+    {
+        printf("-%2x-\n", rcv_buff[i]);
+    }
+    /* Write a buffer in ram, then read back from ram. */
+    pi_ram_write_async(&ram, spi_buff, buff, (uint32_t) BUFFER_SIZE,&cb_tx);
+    printf("Write sync done.\n");
+    pi_ram_read_async(&ram, spi_buff, rcv_buff, (uint32_t) BUFFER_SIZE,&cb_rx);
+    printf("Read sync done.\n");
+
+    /* Verification. */
+    for (uint32_t i=0; i<(uint32_t) BUFFER_SIZE; i++)
+    {
+        printf("%2x-%2x\n", buff[i], rcv_buff[i]);
+        if (buff[i] != rcv_buff[i])
+        {
+            errors++;
+            printf("%2x-%2x\n", buff[i], rcv_buff[i]);
+        }
+    }
+
+    pmsis_l2_malloc_free(buff, (uint32_t) BUFFER_SIZE);
+    pmsis_l2_malloc_free(rcv_buff, (uint32_t) BUFFER_SIZE);
+    pi_ram_free(&ram, spi_buff, (uint32_t) BUFFER_SIZE);
+    pi_ram_close(&ram);
+
+    printf("\nspiram transfer done with %ld error(s) !\n", errors);
+    printf("\nTest %s with %ld error(s) !\n", (errors) ? "failed" : "success", errors);
+    
+    pmsis_exit(errors);
+}
+
+/* Program Entry. */
+int main(void)
+{
+    printf("\n\n\t *** PMSIS spiram Test ***\n\n");
+    return pmsis_kickoff((void *) test_spi_ram);
+}
